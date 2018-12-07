@@ -20,6 +20,7 @@ use Config::Simple;
 
 # iptables globals
 
+#-------------------------------------------------------------------------------
 # -s, --source [!] address[/mask]
 #    Source specification. Address can be either a network name, a hostname 
 #    (please note that specifying any name to be resolved with a remote query 
@@ -45,75 +46,43 @@ if( -e $ini_file ) {
     #print Data::Dumper->Dump( [ \%ini_hash], [ qw(ini_hash) ] );
 }
 
-# Command line strings (Can be generated from command line options.)
-
-my $ipt_general = "iptables -%s INPUT -s \"%s\" -p tcp -m multiport --dports [DPORTS] -j ACCEPT";
-my $ipt_ssh = "iptables -t nat -%s PREROUTING -s \"%s\" -p tcp --dport [DPORT] -j REDIRECT --to-port 22";
-
-for my $option (keys %ini_hash) {
-    next if( ! ($option =~ /default.(.*)/) );
-    my $key = uc $1;
-    my $value = $ini_hash{$option};
-    my $ref = ref($ini_hash{$option});
-    if( $ref eq '' ) {
-	#say "not a ref: ${key}";
-	$value = $ini_hash{$option};
-    } elsif( ref($ini_hash{$option}) eq 'SCALAR' ) {
-	#say "SCALAR";
-	$value = $ini_hash{$option};
-    } elsif( ref($ini_hash{$option}) eq 'ARRAY' ) {
-	#say "ARRAY";
-	$value = join(',', @$value);
-    } else {
-	say "unknown: ${key}";
-	die "trying";
-    }
-    my $pat = "\\[$key]";
-    $ipt_general =~ s/${pat}/$value/;
-    $ipt_ssh     =~ s/${pat}/$value/
-}
-
-say "ipt_general: ${ipt_general}";
-say "ipt_ssh: ${ipt_ssh}";
-
-exit 1;
-
 # Create command hash
 #
 # Usage:
 #   firewall command sub-command argument
 #
 # $cmds is a ref to a hash of commands mapped to sub-commands
-# Each sub-command 
+# Each sub-command has an array of iptable options to execute
 # 
 my $cmds = {
     'open' => {
-	'ssh' => [
-	    [$ipt_ssh, 'I'],
-	    ],
-	'general' => [
-	    [$ipt_general, 'D'],
-	    [$ipt_general, 'I'],
-	],
+	'ssh'     => ['I'],
+	'general' => ['D', 'I'],
     },
 	'close' => {
-	    'ssh' => [
-		[$ipt_ssh, 'D'],
-		],
-	    'general' => [
-		[$ipt_general, 'D'],
-	    ],
+	    'ssh'     => ['D'],
+	    'general' => ['D'],
     },
 };
 
-print Dumper(\$cmds);
+#print Dumper(\$cmds);
 
+# Command line strings
+
+my $iptable_cmds = {
+    'general' => "iptables -%s INPUT -s \"%s\" -p tcp -m multiport --dports [DPORTS] -j ACCEPT",
+    'ssh'     => "iptables -t nat -%s PREROUTING -s \"%s\" -p tcp --dport [DPORT] -j REDIRECT --to-port 22",
+};
+
+#-----------------------------------------------------------------------------
 # Process options
 
 GetOptions('help' => \&help,
     );
 
+replace_strings();
 
+#-----------------------------------------------------------------------------
 # Ensure we have the right number of arguments
 
 if( scalar @ARGV < 3 ) {
@@ -126,6 +95,7 @@ my $cmd = shift @ARGV;
 my $subcmd = shift @ARGV;
 my $arg = shift @ARGV;
 
+#-----------------------------------------------------------------------------
 # Verify the command
 
 die ("Argument 1 incorrect: \"$cmd\"")    
@@ -133,13 +103,14 @@ if( ! exists $cmds->{$cmd} );
 die ("Argument 2 incorrect: \"$subcmd\"") 
 if( ! exists $cmds->{$cmd}->{$subcmd} );
 
+#-----------------------------------------------------------------------------
 # Execute command
 
 print "$0 ${cmd} ${subcmd} ${arg}\n";
 
 Dumper( $cmds->{$cmd} );
 
-doexec( $cmds->{$cmd}->{$subcmd}, $arg );
+doexec( $cmd, $subcmd, $arg);
 
 #-----------------------------------------------------------------------------
 
@@ -158,12 +129,40 @@ sub help {
     exit
 }
 
+sub replace_strings {
+    for my $option (keys %ini_hash) {
+	next if( ! ($option =~ /default.(.*)/) );
+	my $key = uc $1;
+	my $value = $ini_hash{$option};
+	my $ref = ref($ini_hash{$option});
+	if( $ref eq '' ) {
+	    $value = $ini_hash{$option};
+	} elsif( ref($ini_hash{$option}) eq 'SCALAR' ) {
+	    $value = $ini_hash{$option};
+	} elsif( ref($ini_hash{$option}) eq 'ARRAY' ) {
+	    $value = join(',', @$value);
+	} else {
+	    say "unknown: ${key}";
+	    exit 1;
+	}
+	my $pat = "\\[$key]";
+	for my $cmd (keys %$iptable_cmds) {
+	    $iptable_cmds->{$cmd} =~ s/${pat}/$value/;
+	}
+    }
+
+    #print Data::Dumper->Dump( [$iptable_cmds], ['iptable_cmds'] );
+}
+
+#doexec( $cmds->{$cmd}->{$subcmd}, $iptable_cmds, $arg );
+
 sub doexec {
-    print "doexec{\n";
-    my ($cmds, $arg) = @_;
-    for my $line (@$cmds) {
-	my ($cmd, $option) = @{$line};
-	my $cmdline = sprintf($cmd, $option, $arg);
+    print "doexec {\n";
+    my ($cmd, $subcmd, $arg) = @_;
+    my $cmds = $cmds->{$cmd}->{$subcmd};
+    for my $option (@$cmds) {
+	my $cmdline = sprintf($iptable_cmds->{$subcmd}, $option, $arg);
+	print "\t";
 	system("echo", $cmdline);
     }
     print "}\n";
