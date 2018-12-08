@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+rm -rf Data
+rm -rf nd
+rm -f  Languages.txt
+rm -f  Menu.txt
+rm -f  Topics.txt
