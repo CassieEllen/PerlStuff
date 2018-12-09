@@ -20,8 +20,20 @@ print Dumper \@fields;
 my $ref = $p->table;
 #print Dumper $ref;
 
+# returns a reference to an array of Proc::ProcessTable::Process objects. Attributes of a process object are returned by accessors named for the attribute; for example, to get the uid of a process just do:
+#
+#$process->uid
+
+# Iterate through the array of Process objects.
 for my $process (@$ref) {
     print "--------------------------------------------------------------------------------\n";
+
+    # print all data using Dumper
     #print Dumper \$process;
+    
+    # print using hash notation
     print $process->{'pid'}, "\t", $process->{'fname'}, "\n";
+    
+    # print using accessors
+    print $process->pid, "\t", $process->fname, "\n";
 }
