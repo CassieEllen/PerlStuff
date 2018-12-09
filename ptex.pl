@@ -18,5 +18,10 @@ print Dumper @fields;
 print Dumper \@fields;
 
 my $ref = $p->table;
-print Dumper $ref;
+#print Dumper $ref;
 
+for my $process (@$ref) {
+    print "--------------------------------------------------------------------------------\n";
+    #print Dumper \$process;
+    print $process->{'pid'}, "\t", $process->{'fname'}, "\n";
+}
