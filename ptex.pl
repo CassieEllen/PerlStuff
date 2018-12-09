@@ -15,6 +15,7 @@ print Dumper $p;
     
 my @fields = $p->fields;
 print Dumper @fields;
+print Dumper \@fields;
 
 my $ref = $p->table;
 print Dumper $ref;
