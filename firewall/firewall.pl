@@ -17,7 +17,13 @@ use FileHandle;
 
 use Config::Simple;
 
+#-------------------------------------------------------------------------------
 
+my $debug = undef;     # Define to turn on debugging messages.
+$debug = 1;            # Turn on debugging messages
+#$debug = undef;        # Turn off debugging messages
+
+#-------------------------------------------------------------------------------
 # iptables globals
 #-------------------------------------------------------------------------------
 # -s, --source [!] address[/mask]
@@ -31,25 +37,22 @@ use Config::Simple;
 #    for this option.
 #-------------------------------------------------------------------------------
 
-my $debug = undef;     # Define to turn on debugging messages.
-#$debug = 1;            # Turn on debugging messages
-
-my $source;
+my $source;   # Not used, but would replace the arg on the command line.
 
 #-------------------------------------------------------------------------------
 # Read ini file if it exists
 #
-# %ini_hash - maps config names to value strings.
-# $ini_file - uses the current executable filename, changing .pl to .ini.
+# $config_file - uses the current executable filename, changing .pl to .ini.
+# %config_hash - maps config names to value strings.
 #-------------------------------------------------------------------------------
 
-my %ini_hash = (); #**< ini configuration
-my $ini_file = $0;
-$ini_file =~ s/\.pl/\.ini/;
-if( -e $ini_file ) {
-    say "Loading ini file ${ini_file}:";
-    Config::Simple->import_from($ini_file, \%ini_hash);
-    print Data::Dumper->Dump( [ \%ini_hash], [ qw(ini_hash) ] ) if($debug);
+my %config_hash = ();
+my $config_file = $0;
+$config_file =~ s/\.pl/\.ini/;
+if( -e $config_file ) {
+    say "Loading ini file ${config_file}:";
+    Config::Simple->import_from($config_file, \%config_hash);
+    print Data::Dumper->Dump( [ \%config_hash], [ qw(config_hash) ] ) if($debug);
 }
 
 #-------------------------------------------------------------------------------
@@ -73,7 +76,15 @@ my $cmds = {
     },
 };
 
-print Dumper(\$cmds) if($debug);
+print Data::Dumper->Dump( [$cmds], [qw(cmds)]) if($debug);
+
+if($debug) {
+    my @cmd_keys = keys(%$cmds);
+    print Data::Dumper->Dump( [\@cmd_keys], [qw(cmd_keys)] );
+
+    print "Using 'open' as a key\n";
+    print Dumper $cmds->{'open'};
+}
 
 # Command line strings
 
@@ -142,19 +153,19 @@ sub help {
 }
 
 # Function: replace_strings
-# Replaces the string arguments from global %ini_hash
+# Replaces the string arguments from global %config_hash
 # into global %$iptable_cmds.
 sub replace_strings {
-    for my $option (keys %ini_hash) {
+    for my $option (keys %config_hash) {
 	next if( ! ($option =~ /default.(.*)/) );
 	my $key = uc $1;
-	my $value = $ini_hash{$option};
-	my $ref = ref($ini_hash{$option});
+	my $value = $config_hash{$option};
+	my $ref = ref($config_hash{$option});
 	if( $ref eq '' ) {
-	    $value = $ini_hash{$option};
-	} elsif( ref($ini_hash{$option}) eq 'SCALAR' ) {
-	    $value = $ini_hash{$option};
-	} elsif( ref($ini_hash{$option}) eq 'ARRAY' ) {
+	    $value = $config_hash{$option};
+	} elsif( ref($config_hash{$option}) eq 'SCALAR' ) {
+	    $value = $config_hash{$option};
+	} elsif( ref($config_hash{$option}) eq 'ARRAY' ) {
 	    $value = join(',', @$value);
 	} else {
 	    say "unknown: ${key}";
